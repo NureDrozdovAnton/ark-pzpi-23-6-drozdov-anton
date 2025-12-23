@@ -1,0 +1,241 @@
+﻿МІНІСТЕРСТВО ОСВІТИ І НАУКИ УКРАЇНИ 
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ 
+УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ 
+Катедра «Програмна інженерія»
+ 
+Звіт
+до практичного завдання №2
+з дисципліни «Аналіз та рефакторинґ коду» 
+на тему «Методи рефакторинґу коду програмного забезпечення» 
+Виконав:        Прийняв:
+ст. гр. ПЗПІ-23-6        ст. викладач катедри ПІ
+Дроздов Антон        Сокорчук Ігор Петрович
+
+
+
+
+
+
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+№
+	Дата
+	Версія звіту
+	Опис змін та виправлень
+	1
+	22.12.2025
+	1
+	Створено звіт
+	________________
+
+
+2 ЗАВДАННЯ
+Метою цієї роботи є дослідження методів рефакторингу коду з прикладами їх практичного застосування.
+________________
+
+
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+        3.1 Рефакторинг
+        Рефакторинг коду - це процес покращення структури коду без якихось функціональних змін. Рефакторинг робиться з метою покращення структури коду для покращення його розуміння у команді, для зниження порогу входу для нових членів команди, для того щоб зробити код простішим у підтримці та розширенні, щоб зробити подальшу розробку більш ефективною.
+        Під час виконання роботи було розглянуто наступні методи рефакторингу: Remove Middle Man, Replace Error Code with Exception та Pull Up Method. Для прикладів коду у роботі використовується мова Java.
+        3.2 Дослідження методів рефакторингу
+        Remove Middle Man
+        Розглянемо випадок з класом-посередником, методи якого просто викликають методи вкладеного класу, не надаючи ніякої додаткової логіки.
+        Згідно з методом Remove Middle Man такий клас або повністю видаляється (якщо в нього крім цих делегованих викликів більше нічого немає), або повертає об’єкт-делегат і дає можливість клієнту класу викликати необхідні функції самостійно.
+        Цей метод є протилежний метод Hide Delegate і його треба використовувати обережно, не порушуючи закон Деметри. Якщо клієнту потрібно лише одне/два значення - то краще цей метод не застосовувати.
+До рефакторингу:
+1. class Person {
+2.    Department department;
+3. 4.    public Person getManager() {
+5.        return department.getManager();
+6.    }
+7. 8.    public Person getHead() {
+9.        return department.getHead();
+10.    }
+11. 12.    public String getDepartmentName() {
+13.        return department.getName();
+14.    }
+15. }
+16. 17. class Department {
+18.    private Person manager;
+19.    private Person head;
+20.    private String name;
+21. 22.    public Person getManager() {
+23.        return manager;
+24.    }
+25. 26.    public Person getHead() {
+27.        return head;
+28.    }
+29. 30.    public String getName() {
+31.        return name;
+32.    }
+33. }
+34. 35. Person manager = john.getManager();
+36. String deptName = john.getDepartmentName();
+37. Person head = john.getHead();
+Після рефакторингу:
+1. class Person {
+2.    Department department;
+3. 4.    public Department getDepartment() {
+5.        return department;
+6.    }
+7. }
+8. 9. class Department {
+10.    private Person manager;
+11.    private Person head;
+12.    private String name;
+13. 14.    public Person getManager() {
+15.        return manager;
+16.    }
+17. 18.    public Person getHead() {
+19.        return head;
+20.    }
+21. 22.    public String getName() {
+23.        return name;
+24.    }
+25. }
+26. 27. Department department = john.getDepartment();
+28. Person manager = department.getManager();
+29. String deptName = department.getName();
+30. Person head = department.getHead();
+
+
+Replace Error Code with Exception
+Замість повернення числових кодів в якості результату функції при помилках, функції повинні генерувати винятки (exception). Це робиться для відокремлення бізнес-логіки від обробки помилок та для використання єдиного уніфікованого методу обробки помилок у системі.
+До рефакторингу:
+1. class Account {
+2.    private double balance;
+3.    private boolean isBlocked;
+4. 5.    public int withdraw(double amount) {
+6.        if (isBlocked) {
+7.            return -1;
+8.        }
+9.        if (amount > balance) {
+10.            return -2;
+11.        }
+12.        balance -= amount;
+13.        return 0;
+14.    }
+15. }
+16. 17. int result = account.withdraw(100);
+18. if (result == -1) {
+19.    // Обліковий запис заблоковано
+20. } else if (result == -2) {
+21.    // Недостатньо коштів
+22. } else {
+23.    // Виведення успішне
+24. }
+Після рефакторингу:
+1. class AccountException extends RuntimeException {}
+2. class InsufficientFundsException extends AccountException {}
+3. class AccountBlockedException extends AccountException {}
+4. 5. class Account {
+6.    private double balance;
+7.    private boolean isBlocked;
+8. 9.    public void withdraw(double amount) {
+10.        if (isBlocked) {
+11.            throw new AccountBlockedException();
+12.        }
+13.        if (amount > balance) {
+14.            throw new InsufficientFundsException();
+15.        }
+16.        balance -= amount;
+17.        return 0;
+18.    }
+19. }
+20. 21. try {
+22.    account.withdraw(500);
+23.    // Виведення успішне
+24. } catch (InsufficientFundsException e) {
+25.    // Недостатньо коштів
+26. } catch (AccountBlockedException e) {
+27.    /* Обліковий запис заблоковано */ }
+Pull Up Method
+        Цей метод застосовується, коли декілька підкласів мають методи, що виконують однакову роботу. Такі методи треба винести у батьківський клас, таким чином прибравши дублювання коду. Якщо методи не ідентичні, а просто схожі, то спочатку треба однакові частини методів винести в окремий метод (Extract Method метод), а вже потім підняти такий метод у батьківський клас.
+        До рефакторингу:
+1. class Employee {}
+2. 3. class Salesman extends Employee {
+4.    private String name;
+5.    public String getName() { return name; }
+6. }
+7. 8. class Engineer extends Employee {
+9.    private String name;
+10.    public String getName() { return name; }
+11. }
+        Після рефакторингу:
+1. class Employee {
+2.    protected String name;
+3.    public String getName() { return name; }
+4. }
+5. 6. class Salesman extends Employee {}
+7. class Engineer extends Employee {}
+
+
+________________
+
+
+4 ВИСНОВКИ
+        Під час виконання практичної роботи було ознайомлено з поняттям рефакторингу, його цілями та проблемами, які може принести поганий код. Було розглянуто методи рефакторингу Remove Middle Man, Replace Error Code with Exception та Pull Up Method з практичними прикладами.
+________________
+
+
+5 ВИКОРИСТАНІ ДЖЕРЕЛА
+1. Catalog of Refactorings: https://refactoring.com/catalog (дата звернення: 22.12.2025).
+2. Clean Code: A Handbook of Agile Software Craftsmanship — Robert C. Martin: https://github.com/Gatjuat-Wicteat-Riek/clean-code-book (дата звернення: 22.12.2025).
+3. Martin Fowler — Refactoring: Improving the Design of Existing Code: https://martinfowler.com/books/refactoring.html (дата звернення: 22.12.2025).
+________________
+ДОДАТОК А
+Відеозапис доповіді: https://youtu.be/szQvFA1JOf0
+Хронологічний опис відеозапису:
+   * 00:00 - Вступ
+   * 00:45 - Remove Middle Man
+   * 02:49 - Replace Error Code with Exception
+   * 05:09 - Pull Up Method
+   * 06:39 - Висновки
+________________
+ДОДАТОК Б
+Слайди презентації
+  
+
+Рисунок Б.1 - Титульний слайд презентації
+  
+
+Рисунок Б.2 - Вступ
+  
+
+Рисунок Б.3 - Розглянуті методи рефакторингу
+  
+
+Рисунок Б.4 - Remove Middle Man опис
+  
+
+Рисунок Б.5 - Remove Middle Man приклад
+  
+
+Рисунок Б.6 - Replace Error Code with Exception опис
+  
+
+Рисунок Б.7 - Replace Error Code with Exception приклад
+  
+
+Рисунок Б.8 - Pull Up Method опис
+
+
+  
+
+Рисунок Б.9 - Pull Up Method приклад
+  
+
+Рисунок Б.10 - Висновки
+
+
+  
+
+Рисунок Б.11 - Використані джерела
+  
+
+Рисунок Б.12 - Фінальний слайд
